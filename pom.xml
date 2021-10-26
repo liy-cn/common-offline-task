@@ -17,6 +17,8 @@
     <modules>
         <module>common-offline-task-web</module>
         <module>common-offline-task-api</module>
+        <module>common-offline-task-service</module>
+        <module>common-offline-task-dao</module>
     </modules>
 
     <properties>
