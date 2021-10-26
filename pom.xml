@@ -62,10 +62,6 @@
             <artifactId>guava</artifactId>
             <groupId>com.google.guava</groupId>
         </dependency>
-        <dependency>
-            <groupId>com.github.pagehelper</groupId>
-            <artifactId>pagehelper</artifactId>
-        </dependency>
     </dependencies>
 
     <dependencyManagement>
