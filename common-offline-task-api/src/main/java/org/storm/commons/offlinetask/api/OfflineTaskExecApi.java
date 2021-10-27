@@ -5,7 +5,7 @@ import org.storm.commons.offlinetask.common.Response;
 import org.storm.commons.offlinetask.domain.TaskExecResult;
 import org.storm.commons.offlinetask.domain.OfflineTaskDTO;
 
-public interface OfflineTaskExecService {
+public interface OfflineTaskExecApi {
     /**
      * 执行任务
      * @param offlineTaskDTO

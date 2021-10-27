@@ -1,5 +1,4 @@
-package org.storm.commons.offlinetask.api;
-
+package org.storm.commons.offlinetask.service;
 
 public interface OfflineTaskScanService {
     /**
