@@ -4,7 +4,7 @@ import org.storm.commons.offlinetask.common.Page;
 import org.storm.commons.offlinetask.domain.QueryOfflineTaskParam;
 import org.storm.commons.offlinetask.domain.OfflineTaskDTO;
 
-public interface OfflineTaskManageService {
+public interface OfflineTaskManageApi {
 
     /**
      * 删除

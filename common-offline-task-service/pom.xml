@@ -16,4 +16,15 @@
         <maven.compiler.target>8</maven.compiler.target>
     </properties>
 
+    <dependencies>
+        <dependency>
+            <groupId>org.storm.commons</groupId>
+            <artifactId>common-offline-task-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.storm.commons</groupId>
+            <artifactId>common-offline-task-dao</artifactId>
+        </dependency>
+    </dependencies>
+
 </project>
