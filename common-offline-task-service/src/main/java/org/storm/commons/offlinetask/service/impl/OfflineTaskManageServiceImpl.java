@@ -10,7 +10,6 @@ import org.storm.commons.offlinetask.dao.entity.OfflineTaskEntity;
 import org.storm.commons.offlinetask.dao.entity.OfflineTaskParam;
 import org.storm.commons.offlinetask.dao.mapper.OfflineTaskEntityMapper;
 import org.storm.commons.offlinetask.domain.OfflineTaskDTO;
-import org.storm.commons.offlinetask.domain.QueryOfflineTaskParam;
 import org.storm.commons.offlinetask.service.OfflineTaskManageService;
 
 import java.util.ArrayList;
@@ -34,21 +33,16 @@ public class OfflineTaskManageServiceImpl implements OfflineTaskManageService {
         return offlineTaskEntityMapper.insert(record) != 0;
     }
 
-    private OfflineTaskEntity convertToEntity(OfflineTaskDTO record) {
-        return null;
-    }
-
     @Override
     public OfflineTaskEntity selectById(Long id) {
         return offlineTaskEntityMapper.selectById(id);
     }
 
-
     @Override
     public Page<OfflineTaskEntity> selectTaskPage(OfflineTaskParam offlineTaskParam) {
-        List<OfflineTaskEntity> wdbOfflineTaskEntities = offlineTaskEntityMapper.selectTaskPage(offlineTaskParam);
+        List<OfflineTaskEntity> offlineTaskEntities = offlineTaskEntityMapper.selectTaskPage(offlineTaskParam);
         int totalCount = offlineTaskEntityMapper.selectTaskCount(offlineTaskParam);
-        return convertOfflineTaskPage(offlineTaskParam,wdbOfflineTaskEntities,totalCount);
+        return convertOfflineTaskPage(offlineTaskParam, offlineTaskEntities, totalCount);
     }
 
     private List<OfflineTaskDTO> convertToDtoList(List<OfflineTaskEntity> offlineTaskEntityList) {
@@ -62,7 +56,7 @@ public class OfflineTaskManageServiceImpl implements OfflineTaskManageService {
         }).collect(Collectors.toList());
     }
 
-    private Page<OfflineTaskEntity> convertOfflineTaskPage(OfflineTaskParam param,List<OfflineTaskEntity> source,int totalCount) {
+    private Page<OfflineTaskEntity> convertOfflineTaskPage(OfflineTaskParam param, List<OfflineTaskEntity> source, int totalCount) {
         Page<OfflineTaskEntity> target = new Page<>();
         target.setSize(param.getPageSize());
         target.setTotalElements(totalCount);
@@ -71,21 +65,6 @@ public class OfflineTaskManageServiceImpl implements OfflineTaskManageService {
         return target;
     }
 
-
-    private OfflineTaskParam convertOfflineTaskParam(QueryOfflineTaskParam source) {
-        OfflineTaskParam target = new OfflineTaskParam();
-        target.setCurrentPage(source.getPageNum());
-        target.setPageSize(source.getPageSize());
-        target.setClientInfo(source.getClientInfo());
-        target.setPageNum(source.getPageNum());
-        target.setClientCode(source.getClientCode());
-        target.setTaskNo(source.getTaskNo());
-        target.setTaskType(source.getTaskType());
-        target.setTaskStatus(source.getTaskStatus());
-        target.setTaskName(source.getTaskName());
-        target.setTaskDescription(source.getTaskDescription());
-        return target;
-    }
 
     @Override
     public Boolean updateStatus(Long id, Integer status) {
@@ -99,12 +78,4 @@ public class OfflineTaskManageServiceImpl implements OfflineTaskManageService {
         return offlineTaskEntityMapper.selectByTaskNo(taskNo);
     }
 
-    private OfflineTaskDTO convertToDto(OfflineTaskEntity entity) {
-        if (entity == null) {
-            return null;
-        }
-        OfflineTaskDTO dto = new OfflineTaskDTO();
-        BeanUtils.copyProperties(entity, dto);
-        return dto;
-    }
 }

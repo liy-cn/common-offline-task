@@ -5,16 +5,16 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.storm.commons.offlinetask.api.OfflineTaskExecApi;
+import org.storm.commons.offlinetask.ability.OfflineTaskExecAbility;
 import org.storm.commons.offlinetask.common.*;
 import org.storm.commons.offlinetask.dao.entity.OfflineTaskEntity;
 import org.storm.commons.offlinetask.dao.entity.OfflineTaskParam;
 import org.storm.commons.offlinetask.domain.OfflineTaskDTO;
-import org.storm.commons.offlinetask.domain.QueryOfflineTaskParam;
 import org.storm.commons.offlinetask.domain.TaskExecResult;
 import org.storm.commons.offlinetask.enums.TaskStatusEnum;
 import org.storm.commons.offlinetask.exception.BusinessException;
 import org.storm.commons.offlinetask.exception.SystemException;
+import org.storm.commons.offlinetask.service.OfflineTaskExecFactory;
 import org.storm.commons.offlinetask.service.OfflineTaskManageService;
 import org.storm.commons.offlinetask.service.OfflineTaskScanService;
 import redis.clients.jedis.Jedis;
@@ -31,9 +31,6 @@ public class OfflineTaskScanServiceImpl implements OfflineTaskScanService {
 
     @Autowired
     private OfflineTaskManageService offlineTaskManageService;
-
-    @Autowired
-    private OfflineTaskExecApi offlineTaskExecApi;
 
     /**
      * job锁的key
@@ -152,40 +149,40 @@ public class OfflineTaskScanServiceImpl implements OfflineTaskScanService {
     /**
      * 处理逻辑，改成全异步
      *
-     * @param offlineTask
+     * @param taskEntity
      */
-    private void process(OfflineTaskEntity offlineTask) {
+    private void process(OfflineTaskEntity taskEntity) {
         try {
             //检查该任务是否已经在缓存里
-            if (this.taskIsExecuting(offlineTask)) {
-                log.info("该任务[id:{}]已经在执行中", offlineTask.getId());
+            if (this.taskIsExecuting(taskEntity)) {
+                log.info("该任务[id:{}]已经在执行中", taskEntity.getId());
                 return;
             }
             //把当前任务放到缓存的待执行列表里
-            this.lockTask(offlineTask);
+            this.lockTask(taskEntity);
             //设置状态为执行中
-            this.updateDbStatusZhiXingZhong(offlineTask);
-            OfflineTaskExecApi execService = OfflineTaskExecFactory.getTaskType(offlineTask.getTaskType());
+            this.updateDbStatusZhiXingZhong(taskEntity);
+            OfflineTaskExecAbility execService = OfflineTaskExecFactory.getTaskType(taskEntity.getTaskType());
 
-            Response<TaskExecResult> response = execService.executeTask(this.convertToDto(offlineTask));//去执行
+            Response<TaskExecResult> response = execService.executeTask(this.convertToDto(taskEntity));//去执行
 
             //根据执行结果，设置状态为执行成功或失败
             if (ResponseCodeEnum.SUCCESS.code().equals(response.getCode())) {
                 //设置状态为成功
-                this.updateDbStatusChengGong(offlineTask);
+                this.updateDbStatusChengGong(taskEntity);
             } else {
                 //设置状态为失败
-                this.updateDbStatusShiBai(offlineTask);
+                this.updateDbStatusShiBai(taskEntity);
             }
             this.sendMq(response);
         } catch (Exception e) {
             log.error("任务执行过程中发现异常，原因：{}，当前线程名[{},(线程id：{})]", e.getMessage(), Thread.currentThread().getName(), Thread.currentThread().getId(), e);
             //设置状态为失败
-            this.updateDbStatusShiBai(offlineTask);
+            this.updateDbStatusShiBai(taskEntity);
             throw new SystemException(e);
         } finally {
             //完成任务后去掉
-            this.unlockTask(offlineTask);
+            this.unlockTask(taskEntity);
         }
     }
 

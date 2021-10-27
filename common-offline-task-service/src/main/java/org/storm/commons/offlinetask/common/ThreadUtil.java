@@ -70,7 +70,7 @@ public class ThreadUtil {
      * 等待执行完成
      * @param future
      */
-    public static void wait4Done(Future future) {
+    public static void waitForDone(Future future) {
         try {
             if (future != null) {
                 future.get();
