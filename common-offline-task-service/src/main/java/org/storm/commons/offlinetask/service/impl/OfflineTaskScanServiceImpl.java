@@ -6,11 +6,9 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.storm.commons.offlinetask.api.OfflineTaskExecApi;
-import org.storm.commons.offlinetask.common.Page;
-import org.storm.commons.offlinetask.common.Response;
-import org.storm.commons.offlinetask.common.ResponseCodeEnum;
-import org.storm.commons.offlinetask.common.ThreadUtil;
+import org.storm.commons.offlinetask.common.*;
 import org.storm.commons.offlinetask.dao.entity.OfflineTaskEntity;
+import org.storm.commons.offlinetask.dao.entity.OfflineTaskParam;
 import org.storm.commons.offlinetask.domain.OfflineTaskDTO;
 import org.storm.commons.offlinetask.domain.QueryOfflineTaskParam;
 import org.storm.commons.offlinetask.domain.TaskExecResult;
@@ -19,8 +17,8 @@ import org.storm.commons.offlinetask.exception.BusinessException;
 import org.storm.commons.offlinetask.exception.SystemException;
 import org.storm.commons.offlinetask.service.OfflineTaskManageService;
 import org.storm.commons.offlinetask.service.OfflineTaskScanService;
+import redis.clients.jedis.Jedis;
 
-import javax.annotation.Resource;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -30,9 +28,6 @@ import java.util.concurrent.ExecutorService;
 @Service
 @Slf4j
 public class OfflineTaskScanServiceImpl implements OfflineTaskScanService {
-
-    @Resource(name = "jimClient")
-    private Cluster jimClient;
 
     @Autowired
     private OfflineTaskManageService offlineTaskManageService;
@@ -59,24 +54,20 @@ public class OfflineTaskScanServiceImpl implements OfflineTaskScanService {
     @Override
     public void scanTask() {
         log.info("----------------scanTask()开始----------------");
-        Cluster jimClient = this.getCacheClient();
-        if (jimClient == null) {
-            log.error("jedis实例为null，任务返回");
-            return;
-        }
+        Jedis jedis = this.getCacheClient();
 
         //加一个任务锁，当前时刻只有一台机器在执行这个扫描工作
         String requestId = UUID.randomUUID().toString();
         boolean tryGetDistributedLockSuccess = false;
         try {
-            tryGetDistributedLockSuccess = this.tryGetJobLock(jimClient, requestId);
+            tryGetDistributedLockSuccess = this.tryGetJobLock(jedis, requestId);
             if (!tryGetDistributedLockSuccess) {
                 log.info("job没有获取到锁，任务返回");
                 return;
             }
         } catch (Exception e) {
             log.error("获取job的锁异常，任务返回，原因：{}", e.getMessage(), e);
-            this.releaseJobLock(jimClient, requestId);
+            this.releaseJobLock(jedis, requestId);
             return;
         }
 
@@ -109,9 +100,14 @@ public class OfflineTaskScanServiceImpl implements OfflineTaskScanService {
         } catch (Exception e) {
             log.error("执行过程中出现异常，原因：{}", e.getMessage(), e);
         } finally {
-            this.releaseJobLock(jimClient, requestId);
+            this.releaseJobLock(jedis, requestId);
             log.info("----------------scanTask()结束----------------");
         }
+    }
+
+    private Jedis getCacheClient() {
+        Jedis jedis = new Jedis("localhost", 6379);
+        return jedis;
     }
 
     private void checkTask(List<OfflineTaskEntity> taskEntityList) {
@@ -133,29 +129,24 @@ public class OfflineTaskScanServiceImpl implements OfflineTaskScanService {
     }
 
     private List<OfflineTaskEntity> getTaskEntityList() {
-        QueryOfflineTaskParam queryOfflineTaskParam = new QueryOfflineTaskParam();
+        OfflineTaskParam queryOfflineTaskParam = new OfflineTaskParam();
         queryOfflineTaskParam.setTaskStatus(TaskStatusEnum.DAI_ZHI_XING.getCode());
         queryOfflineTaskParam.setPageNum(1);
         queryOfflineTaskParam.setPageSize(3);
-        Page<OfflineTaskEntity> taskPage = offlineTaskManageApi.queryTask(queryOfflineTaskParam);
+        Page<OfflineTaskEntity> taskPage = offlineTaskManageService.selectTaskPage(queryOfflineTaskParam);
         return taskPage.getContent();
     }
 
-    private boolean releaseJobLock(Cluster jimClient, String requestId) {
-        boolean result = JimDbTools.releaseDistributedLock(jimClient, JOB_LOCK_KEY, requestId);
+    private boolean releaseJobLock(Jedis jedis, String requestId) {
+        boolean result = RedisTools.releaseDistributedLock(jedis, JOB_LOCK_KEY, requestId);
         log.info("releaseJobLock()结果：{}", result);
         return result;
     }
 
-    private boolean tryGetJobLock(Cluster jimClient, String requestId) {
-        boolean tryGetDistributedLockSuccess = JimDbTools.tryGetDistributedLock(jimClient, JOB_LOCK_KEY, requestId, JOB_LOCK_EXPIRE_TIME);
+    private boolean tryGetJobLock(Jedis jedis, String requestId) {
+        boolean tryGetDistributedLockSuccess = RedisTools.tryGetDistributedLock(jedis, JOB_LOCK_KEY, requestId, JOB_LOCK_EXPIRE_TIME);
         log.info("tryGetJobLock结果：{}", tryGetDistributedLockSuccess);
         return tryGetDistributedLockSuccess;
-    }
-
-    private Cluster getCacheClient() {
-        //Jedis jedis = new Jedis("localhost", 6379);
-        return jimClient;
     }
 
     /**
@@ -207,7 +198,7 @@ public class OfflineTaskScanServiceImpl implements OfflineTaskScanService {
     @Override
     public void reDoTask(Long taskId) {
         try {
-            OfflineTaskEntity taskEntity = offlineTaskManageApi.selectById(taskId);
+            OfflineTaskEntity taskEntity = offlineTaskManageService.selectById(taskId);
             if (!TaskStatusEnum.SHI_BAI.getCode().equals(taskEntity.getTaskStatus())) {
                 log.info("该任务的状态不是失败状态，不可重新执行");
                 return;
@@ -222,7 +213,7 @@ public class OfflineTaskScanServiceImpl implements OfflineTaskScanService {
 
     private void updateDbStatusShiBai(OfflineTaskEntity offlineTask) {
         Long taskId = offlineTask.getId();
-        Boolean success = offlineTaskManageApi.updateStatus(taskId, TaskStatusEnum.SHI_BAI.getCode());
+        Boolean success = offlineTaskManageService.updateStatus(taskId, TaskStatusEnum.SHI_BAI.getCode());
         if (!success) {
             throw new BusinessException("任务[id:" + taskId + "]更新状态为[" + TaskStatusEnum.SHI_BAI.getDesc() + "]时失败");
         }
@@ -230,7 +221,7 @@ public class OfflineTaskScanServiceImpl implements OfflineTaskScanService {
 
     private void updateDbStatusChengGong(OfflineTaskEntity offlineTask) {
         Long taskId = offlineTask.getId();
-        Boolean success = offlineTaskManageApi.updateStatus(taskId, TaskStatusEnum.CHENG_GONG.getCode());
+        Boolean success = offlineTaskManageService.updateStatus(taskId, TaskStatusEnum.CHENG_GONG.getCode());
         if (!success) {
             throw new BusinessException("任务[id:" + taskId + "]更新状态为[" + TaskStatusEnum.CHENG_GONG.getDesc() + "]时失败");
         }
@@ -238,7 +229,7 @@ public class OfflineTaskScanServiceImpl implements OfflineTaskScanService {
 
     private void updateDbStatusZhiXingZhong(OfflineTaskEntity offlineTask) {
         Long taskId = offlineTask.getId();
-        Boolean success = offlineTaskManageApi.updateStatus(taskId, TaskStatusEnum.ZHI_XING_ZHONG.getCode());
+        Boolean success = offlineTaskManageService.updateStatus(taskId, TaskStatusEnum.ZHI_XING_ZHONG.getCode());
         if (!success) {
             throw new BusinessException("任务[id:" + taskId + "]更新状态为[" + TaskStatusEnum.ZHI_XING_ZHONG.getDesc() + "]时失败");
         }
@@ -246,21 +237,21 @@ public class OfflineTaskScanServiceImpl implements OfflineTaskScanService {
 
     private boolean taskIsExecuting(OfflineTaskEntity offlineTask) {
         String taskId = this.getCacheValue(offlineTask);
-        Cluster jimClient = this.getCacheClient();
-        return jimClient.sIsMember(MY_EXECUTING_TASK_SET, taskId);
+        Jedis jedis = this.getCacheClient();
+        return jedis.sismember(MY_EXECUTING_TASK_SET, taskId);
     }
 
     private void unlockTask(OfflineTaskEntity offlineTask) {
         String taskId = this.getCacheValue(offlineTask);
-        Cluster jimClient = this.getCacheClient();
-        Long removeCount = jimClient.sRem(MY_EXECUTING_TASK_SET, taskId);
+        Jedis jedis = this.getCacheClient();
+        Long removeCount = jedis.srem(MY_EXECUTING_TASK_SET, taskId);
         log.info("从缓存[{}]删除任务[id:{}]，返回值:{}", MY_EXECUTING_TASK_SET, taskId, removeCount);
     }
 
     private void lockTask(OfflineTaskEntity taskEntity) {
         String taskId = this.getCacheValue(taskEntity);
-        Cluster jimClient = this.getCacheClient();
-        Long addCount = jimClient.sAdd(MY_EXECUTING_TASK_SET, taskId);
+        Jedis jedis = this.getCacheClient();
+        Long addCount = jedis.sadd(MY_EXECUTING_TASK_SET, taskId);
         log.info("从缓存[{}]添加任务[id:{}]，返回值:{}", MY_EXECUTING_TASK_SET, taskId, addCount);
     }
 
@@ -275,8 +266,8 @@ public class OfflineTaskScanServiceImpl implements OfflineTaskScanService {
      * @return
      */
     private List<OfflineTaskEntity> minusExecutingTask(List<OfflineTaskEntity> taskEntityList) {
-        Cluster jimClient = this.getCacheClient();
-        Set<String> taskNoSet = jimClient.sMembers(MY_EXECUTING_TASK_SET);
+        Jedis jedis = this.getCacheClient();
+        Set<String> taskNoSet = jedis.smembers(MY_EXECUTING_TASK_SET);
         if (taskNoSet.isEmpty()) {
             return taskEntityList;
         }
