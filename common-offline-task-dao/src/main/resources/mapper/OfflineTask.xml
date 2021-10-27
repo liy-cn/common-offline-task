@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="org.storm.commons.offlinetask.dao.mapper.OfflineTaskEntityMapper" >
+  <resultMap id="BaseResultMap" type="org.storm.commons.offlinetask.dao.entity.OfflineTaskEntity" >
+    <id column="id" property="id" jdbcType="BIGINT" />
+    <result column="client_code" property="clientCode" jdbcType="TINYINT" />
+    <result column="task_no" property="taskNo" jdbcType="VARCHAR" />
+    <result column="task_type" property="taskType" jdbcType="TINYINT" />
+    <result column="task_status" property="taskStatus" jdbcType="TINYINT" />
+    <result column="task_name" property="taskName" jdbcType="VARCHAR" />
+    <result column="task_description" property="taskDescription" jdbcType="VARCHAR" />
+    <result column="task_progress" property="taskProgress" jdbcType="DOUBLE" />
+    <result column="task_param" property="taskParam" jdbcType="VARCHAR" />
+    <result column="task_file_address" property="taskFileAddress" jdbcType="VARCHAR" />
+    <result column="task_result_msg" property="taskResultMsg" jdbcType="VARCHAR" />
+    <result column="client_info" property="clientInfo" jdbcType="VARCHAR" />
+    <result column="creator" property="creator" jdbcType="VARCHAR" />
+    <result column="created" property="created" jdbcType="TIMESTAMP" />
+    <result column="modifier" property="modifier" jdbcType="VARCHAR" />
+    <result column="modified" property="modified" jdbcType="TIMESTAMP" />
+    <result column="yn" property="yn" jdbcType="TINYINT" />
+  </resultMap>
+  <sql id="Base_Column_List" >
+    id, client_code, task_no, task_type, task_status,
+    task_name, task_description, task_progress, task_param, task_file_address, task_result_msg,
+    client_info, creator, created, modifier, modified, yn
+  </sql>
+    <sql id="select_condition">
+        <trim prefix="where" prefixOverrides="and |or">
+            yn=1
+            <if test="id != null">
+                and id = #{id}
+            </if>
+            <if test="clientCode != null">
+                and client_code = #{clientCode}
+            </if>
+            <if test="taskNo != null and taskNo!=''">
+                and task_no = #{taskNo}
+            </if>
+            <if test="taskType != null">
+                and task_type = #{taskType}
+            </if>
+            <if test="taskStatus != null">
+                and task_status = #{taskStatus}
+            </if>
+            <if test="taskName != null and taskName!=''">
+                and task_name = #{taskName}
+            </if>
+            <if test="taskDescription != null and taskDescription!=''">
+                and task_description = #{taskDescription}
+            </if>
+            <if test="clientInfo != null and clientInfo!=''">
+                and client_info = #{clientInfo}
+            </if>
+        </trim>
+    </sql>
+  <select id="selectById" resultMap="BaseResultMap" parameterType="java.lang.Long" >
+    select
+    <include refid="Base_Column_List" />
+    from common_offline_task
+    where id = #{id,jdbcType=BIGINT} and yn=1
+  </select>
+  <delete id="delete" parameterType="java.lang.Long" >
+    update common_offline_task set yn = 0,modified = now() where id = #{id}
+  </delete>
+  <insert id="insert" parameterType="org.storm.commons.offlinetask.dao.entity.OfflineTaskEntity" >
+    insert into common_offline_task (id, client_code, task_no,
+      task_type, task_status, task_name,
+      task_description, task_progress, task_param,
+      task_file_address, task_result_msg, client_info,
+      creator, created, modifier,
+      modified)
+    values (#{id,jdbcType=BIGINT}, #{clientCode,jdbcType=TINYINT},  #{taskNo,jdbcType=VARCHAR},
+      #{taskType,jdbcType=TINYINT}, #{taskStatus,jdbcType=TINYINT}, #{taskName,jdbcType=VARCHAR},
+      #{taskDescription,jdbcType=VARCHAR}, #{taskProgress,jdbcType=DOUBLE}, #{taskParam,jdbcType=VARCHAR},
+      #{taskFileAddress,jdbcType=VARCHAR}, #{taskResultMsg,jdbcType=VARCHAR}, #{clientInfo,jdbcType=VARCHAR},
+      #{creator,jdbcType=VARCHAR}, #{created,jdbcType=TIMESTAMP}, #{modifier,jdbcType=VARCHAR},
+      #{modified,jdbcType=TIMESTAMP})
+  </insert>
+
+  <update id="updateStatus" >
+    update common_offline_task set task_status = #{taskStatus},modified = now() where id = #{id} and yn=1
+  </update>
+
+    <update id="updateAddress">
+        update common_offline_task set task_file_address = #{taskFileAddress},modified = now() where id = #{id} and yn=1
+    </update>
+
+    <update id="updateResultMsg" >
+        update common_offline_task set task_result_msg = #{taskResultMsg},modified = now() where id = #{id} and yn=1
+    </update>
+
+    <select id="selectTaskPage" resultMap="BaseResultMap" parameterType="org.storm.commons.offlinetask.dao.entity.OfflineTaskParam" >
+        select
+        <include refid="Base_Column_List" />
+        from common_offline_task
+        <include refid="select_condition"/>
+        order by modified DESC
+        limit #{startRow}, #{pageSize}
+    </select>
+
+    <select id="selectTaskCount" resultType="java.lang.Integer" parameterType="org.storm.commons.offlinetask.dao.entity.OfflineTaskParam">
+        select
+        count(1)
+        from common_offline_task
+        <include refid="select_condition" />
+    </select>
+
+    <select id="selectByTaskNo" resultMap="BaseResultMap" parameterType="java.lang.String" >
+        select
+        <include refid="Base_Column_List" />
+        from common_offline_task
+        where task_no = #{taskNo} and yn=1
+    </select>
+
+</mapper>
