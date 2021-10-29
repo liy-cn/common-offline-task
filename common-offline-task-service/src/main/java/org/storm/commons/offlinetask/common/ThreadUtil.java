@@ -50,7 +50,7 @@ public class ThreadUtil {
 
     static class CustomThreadNameThreadFactory implements ThreadFactory {
 
-        private AtomicInteger threadNo = new AtomicInteger(1);
+        private final AtomicInteger threadNo = new AtomicInteger(1);
         private final String  nameStart;
         private static final String  nameEnd  = "]";
 
