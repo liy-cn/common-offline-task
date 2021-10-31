@@ -23,7 +23,7 @@ public class OfflineTaskJob {
         long start=System.currentTimeMillis();
         offlineTaskScanService.scanTask();
         long end =System.currentTimeMillis();
-        log.info("OfflineTaskJob end. time:{}ms",end-start);
+        log.info("OfflineTaskJob end. time:{}ms\n",end-start);
 
     }
 }

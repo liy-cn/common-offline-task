@@ -1,4 +1,4 @@
-package org.storm.commons.commonofflinetaskweb;
+package org.storm.commons.offlinetask;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
